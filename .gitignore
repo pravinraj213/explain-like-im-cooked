@@ -1,0 +1,6 @@
+*.zip
+__pycache__/
+*.pyc
+.env
+.DS_Store
+ARTICLE_DRAFT.md

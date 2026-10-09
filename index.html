@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explain Like I'm Cooked — The 2 AM Panic Agent</title>
+    <meta name="description" content="Instant, noise-free diagnostics for late-night compiler errors, IAM access denials, and build crashes. Powered by Amazon Bedrock Nova Lite.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='100%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' stop-color='%234f46e5'/%3E%3Cstop offset='100%25' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M9 11l4 4-4 4m6 0h6m-16 7h22a3 3 0 003-3V7a3 3 0 00-3-3H5a3 3 0 00-3 3v15a3 3 0 003 3z' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        :root {
+            --bg-base: #080b12;
+            --surface-1: #0e1424;
+            --surface-2: #141c30;
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.16);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-base);
+            color: #e2e8f0;
+        }
+        
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .bg-ambient {
+            background-image: 
+                radial-gradient(ellipse 70% 40% at 50% -10%, rgba(99, 102, 241, 0.18), transparent 70%),
+                radial-gradient(ellipse 50% 30% at 85% 15%, rgba(168, 85, 247, 0.12), transparent 60%);
+        }
+
+        .glass-card {
+            background: linear-gradient(180deg, rgba(20, 28, 48, 0.65) 0%, rgba(14, 20, 36, 0.8) 100%);
+            border: 1px solid var(--border-subtle);
+            backdrop-filter: blur(12px);
+        }
+
+        .glass-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        /* Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 9999px;
+            background: #1e293b;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 22px;
+            width: 22px;
+            border-radius: 50%;
+            background: #f43f5e;
+            border: 3px solid #0e1424;
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 0 14px rgba(244, 63, 94, 0.5);
+            transition: transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .spinner {
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-top: 2px solid #ffffff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080b12;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="bg-ambient min-h-screen flex flex-col antialiased selection:bg-indigo-500/30 selection:text-white">
+
+    <!-- Header / Navbar: Stays sleek & single-row across all viewports -->
+    <header class="border-b border-white/[0.06] bg-[#080b12]/75 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 3-3 3m4.5 0h4.5m-12 5.25h15a2.25 2.25 0 002.25-2.25V6a2.25 2.25 0 00-2.25-2.25H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span class="text-sm sm:text-base font-bold tracking-tight text-white">Explain Like I'm Cooked</span>
+                    <span class="hidden sm:inline-block text-[11px] font-medium text-indigo-300/70 border-l border-white/10 pl-2">2 AM Panic Agent</span>
+                </div>
+            </div>
+
+            <!-- Author Portfolio Link -->
+            <a 
+                href="https://pravinraj.me" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] rounded-full transition-all duration-150 hover:shadow-sm"
+                title="Pravinraj Portfolio"
+            >
+                <span>pravinraj.me</span>
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                </svg>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+        <!-- Banner Card -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight">Zero-Fluff Emergency Diagnostics</h1>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Paste your cryptic stack trace, AWS IAM error, or build failure for an immediate tourniquet.</p>
+            </div>
+            <div class="inline-flex items-center space-x-2 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full self-start sm:self-auto shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Powered by Amazon Bedrock</span>
+            </div>
+        </div>
+
+        <!-- Urgency / Panic Meter -->
+        <section class="glass-card rounded-2xl p-4 sm:p-5 transition-all">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2 text-xs sm:text-sm font-semibold text-slate-200">
+                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                    </svg>
+                    <span>Urgency Level</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span id="panicBadgeDot" class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span id="panicBadgeText" class="font-mono text-xs font-bold text-rose-400">85% Critical</span>
+                </div>
+            </div>
+
+            <input 
+                type="range" 
+                id="panicSlider" 
+                min="0" 
+                max="100" 
+                value="85" 
+                class="w-full cursor-pointer"
+            >
+
+            <!-- Three Dynamic Tier Cards -->
+            <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/[0.06] text-xs">
+                <div id="bracketLow" class="p-2 rounded-lg bg-white/[0.02] border border-transparent transition-all">
+                    <div class="font-semibold text-slate-300">0 – 30%</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">Patient, concept-first breakdown</div>
+                </div>
+                <div id="bracketMid" class="p-2 rounded-lg bg-white/[0.02] border border-transparent transition-all">
+                    <div class="font-semibold text-slate-300">31 – 70%</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">Quick fix + real-world analogy</div>
+                </div>
+                <div id="bracketHigh" class="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 transition-all">
+                    <div class="font-bold text-rose-300">71 – 100%</div>
+                    <div class="text-[11px] text-rose-400/90 mt-0.5 leading-tight font-medium">1-line direct fix, zero talk</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Input Panel -->
+        <section class="glass-card rounded-2xl overflow-hidden border border-white/[0.08] focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all">
+            <!-- Terminal Title Bar -->
+            <div class="px-4 py-2.5 bg-black/40 border-b border-white/[0.06] flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="flex space-x-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                    </div>
+                    <span class="font-mono text-xs text-slate-400 ml-2">stacktrace.log</span>
+                </div>
+                <span class="text-[11px] text-slate-500 hidden sm:inline font-mono">Press Ctrl + Enter to submit</span>
+            </div>
+
+            <div class="p-4 sm:p-5">
+                <textarea 
+                    id="errorInput" 
+                    rows="8" 
+                    class="w-full bg-transparent text-slate-200 font-mono text-xs sm:text-sm focus:outline-none resize-y leading-relaxed placeholder:text-slate-600"
+                    placeholder="Paste error logs, compiler messages, or AWS AccessDeniedException...&#10;&#10;e.g.&#10;AccessDeniedException: User: arn:aws:iam::123:user/dev is not authorized to perform: bedrock:InvokeModel on resource: *"
+                ></textarea>
+
+                <div class="mt-4 pt-3 border-t border-white/[0.06] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div class="text-xs text-slate-500 flex items-center space-x-1.5">
+                        <svg class="w-4 h-4 text-indigo-400/80" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                        </svg>
+                        <span>Ephemeral execution · No logs stored</span>
+                    </div>
+
+                    <button 
+                        id="rescueBtn"
+                        class="inline-flex items-center justify-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:via-purple-500 hover:to-pink-500 text-white font-semibold text-xs sm:text-sm transition-all duration-150 shadow-md shadow-indigo-500/25 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg id="btnIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                        </svg>
+                        <span id="btnText">Diagnose &amp; Fix</span>
+                        <div id="btnSpinner" class="spinner hidden"></div>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Response Area (Dynamic Output) -->
+        <section id="outputArea" class="hidden space-y-4">
+            
+            <!-- Immediate Solution Card -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border-emerald-500/30 shadow-lg shadow-emerald-950/20">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+                        <h2 class="text-xs sm:text-sm font-bold text-emerald-400 tracking-wider uppercase">The Fix</h2>
+                    </div>
+                    <button 
+                        id="copyBtn"
+                        class="inline-flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700 rounded-lg border border-white/10 transition-colors"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.849A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.599m9.666 0A2.25 2.25 0 0118 6v12a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
+                        </svg>
+                        <span id="copyBtnText">Copy Fix</span>
+                    </button>
+                </div>
+                <div class="rounded-xl bg-black/60 p-4 border border-white/[0.08] overflow-x-auto">
+                    <pre class="font-mono text-xs sm:text-sm text-emerald-300 leading-relaxed whitespace-pre-wrap"><code id="tourniquetCode"></code></pre>
+                </div>
+            </div>
+
+            <!-- Root Cause Card -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border-amber-500/30">
+                <div class="flex items-center space-x-2 mb-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                    <h2 class="text-xs sm:text-sm font-bold text-amber-400 tracking-wider uppercase">What Actually Happened</h2>
+                </div>
+                <p id="postMortem" class="text-xs sm:text-sm text-slate-200 leading-relaxed pl-4 border-l-2 border-amber-500/40"></p>
+            </div>
+
+            <!-- Operational Context Card -->
+            <div class="glass-card rounded-2xl p-4 sm:p-5 border-indigo-500/30">
+                <div class="flex items-center space-x-2 mb-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+                    <h2 class="text-xs sm:text-sm font-bold text-indigo-400 tracking-wider uppercase">Operational Context</h2>
+                </div>
+                <p id="sanityCheck" class="text-xs sm:text-sm text-slate-300 leading-relaxed pl-4 border-l-2 border-indigo-500/40"></p>
+            </div>
+        </section>
+
+        <!-- Error Card -->
+        <div id="errorArea" class="hidden glass-card rounded-2xl p-4 sm:p-5 border-rose-500/50 bg-rose-950/20">
+            <div class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 7.5h.008v.008H12v-.008z" />
+                </svg>
+                <div>
+                    <h3 class="text-xs sm:text-sm font-bold text-rose-300">Request Failed</h3>
+                    <p id="errorMessage" class="text-xs text-rose-400/90 mt-1"></p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/[0.06] bg-[#080b12]/90 mt-auto py-5">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div>
+                Built with Amazon Bedrock Nova Lite &amp; AWS Lambda
+            </div>
+            <div class="flex items-center space-x-3">
+                <a href="https://pravinraj.me" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-white transition-colors">
+                    pravinraj.me
+                </a>
+                <span>·</span>
+                <span class="text-slate-500">AWS Weekend Challenge</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // API Endpoint Configuration (relative path works on same origin, fallback to full URL)
+        const API_ENDPOINT = window.EXPLAIN_API_ENDPOINT || '/rescue';
+
+        const panicSlider = document.getElementById('panicSlider');
+        const panicBadgeText = document.getElementById('panicBadgeText');
+        const panicBadgeDot = document.getElementById('panicBadgeDot');
+        const bracketLow = document.getElementById('bracketLow');
+        const bracketMid = document.getElementById('bracketMid');
+        const bracketHigh = document.getElementById('bracketHigh');
+
+        const errorInput = document.getElementById('errorInput');
+        const rescueBtn = document.getElementById('rescueBtn');
+        const btnText = document.getElementById('btnText');
+        const btnIcon = document.getElementById('btnIcon');
+        const btnSpinner = document.getElementById('btnSpinner');
+
+        const outputArea = document.getElementById('outputArea');
+        const errorArea = document.getElementById('errorArea');
+        const errorMessage = document.getElementById('errorMessage');
+
+        const tourniquetCode = document.getElementById('tourniquetCode');
+        const postMortem = document.getElementById('postMortem');
+        const sanityCheck = document.getElementById('sanityCheck');
+        const copyBtn = document.getElementById('copyBtn');
+        const copyBtnText = document.getElementById('copyBtnText');
+
+        function updateSliderUI(val) {
+            const num = parseInt(val, 10);
+            
+            // Reset bracket classes
+            bracketLow.className = 'p-2 rounded-lg bg-white/[0.02] border border-transparent transition-all text-slate-500';
+            bracketMid.className = 'p-2 rounded-lg bg-white/[0.02] border border-transparent transition-all text-slate-500';
+            bracketHigh.className = 'p-2 rounded-lg bg-white/[0.02] border border-transparent transition-all text-slate-500';
+
+            if (num <= 30) {
+                panicBadgeDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+                panicBadgeText.className = 'font-mono text-xs font-bold text-emerald-400';
+                panicBadgeText.textContent = `${num}% Calm`;
+                bracketLow.className = 'p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-medium transition-all';
+                panicSlider.style.accentColor = '#10b981';
+            } else if (num <= 70) {
+                panicBadgeDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+                panicBadgeText.className = 'font-mono text-xs font-bold text-amber-400';
+                panicBadgeText.textContent = `${num}% Pressured`;
+                bracketMid.className = 'p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium transition-all';
+                panicSlider.style.accentColor = '#f59e0b';
+            } else {
+                panicBadgeDot.className = 'w-2 h-2 rounded-full bg-rose-500';
+                panicBadgeText.className = 'font-mono text-xs font-bold text-rose-400';
+                panicBadgeText.textContent = `${num}% Critical`;
+                bracketHigh.className = 'p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 font-medium transition-all';
+                panicSlider.style.accentColor = '#f43f5e';
+            }
+        }
+
+        panicSlider.addEventListener('input', (e) => updateSliderUI(e.target.value));
+        updateSliderUI(panicSlider.value);
+
+        // Copy functionality
+        copyBtn.addEventListener('click', async () => {
+            const code = tourniquetCode.textContent;
+            try {
+                await navigator.clipboard.writeText(code);
+                copyBtnText.textContent = 'Copied!';
+                setTimeout(() => { copyBtnText.textContent = 'Copy Fix'; }, 2000);
+            } catch (err) {
+                copyBtnText.textContent = 'Failed';
+                setTimeout(() => { copyBtnText.textContent = 'Copy Fix'; }, 2000);
+            }
+        });
+
+        // Response parser for structured output
+        function parseResponse(text) {
+            const result = {
+                tourniquet: '',
+                postMortem: '',
+                sanityCheck: ''
+            };
+
+            const tourniquetMatch = text.match(/###\s*(?:THE\s+)?(?:TOURNIQUET|FIX)\s*```(?:\w+)?\s*([\s\S]*?)```/i);
+            const postMortemMatch = text.match(/###\s*(?:WHAT\s+ACTUALLY\s+HAPPENED|WHAT\s+BROKE|ROOT\s+CAUSE)\s*(.*?)(?=###|$)/is);
+            const sanityMatch = text.match(/###\s*(?:SANITY\s+CHECK|OPERATIONAL\s+CONTEXT)\s*(.*?)(?=###|$)/is);
+
+            if (tourniquetMatch) {
+                result.tourniquet = tourniquetMatch[1].trim();
+            } else {
+                const codeMatch = text.match(/```(?:\w+)?\s*([\s\S]*?)```/);
+                if (codeMatch) {
+                    result.tourniquet = codeMatch[1].trim();
+                }
+            }
+
+            if (postMortemMatch) {
+                result.postMortem = postMortemMatch[1].trim();
+            } else {
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 20 && !l.startsWith('```') && !l.startsWith('#'));
+                if (lines.length > 0) {
+                    result.postMortem = lines[0];
+                }
+            }
+
+            if (sanityMatch) {
+                result.sanityCheck = sanityMatch[1].trim();
+            } else {
+                const sentences = text.split(/[.!]\s+/).map(s => s.trim()).filter(s => s.length > 20);
+                if (sentences.length > 1) {
+                    result.sanityCheck = sentences[sentences.length - 1] + '.';
+                } else {
+                    result.sanityCheck = 'Verify syntax, permissions, and environment variables before re-running.';
+                }
+            }
+
+            return result;
+        }
+
+        // Trigger request
+        async function runRescue() {
+            const errorText = errorInput.value.trim();
+            const panicLevel = parseInt(panicSlider.value, 10);
+
+            if (!errorText) {
+                errorInput.focus();
+                return;
+            }
+
+            rescueBtn.disabled = true;
+            btnText.textContent = 'Diagnosing...';
+            btnIcon.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+            outputArea.classList.add('hidden');
+            errorArea.classList.add('hidden');
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        error_text: errorText,
+                        panic_level: panicLevel
+                    })
+                });
+
+                if (response.status === 429) {
+                    throw new Error('Rate limit exceeded (5 requests/sec). Please wait a few seconds and try again.');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Server returned HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const parsed = parseResponse(data.explanation || '');
+                tourniquetCode.textContent = parsed.tourniquet || data.explanation;
+                postMortem.textContent = parsed.postMortem || 'Analysis complete.';
+                sanityCheck.textContent = parsed.sanityCheck || 'Ready for re-execution.';
+
+                outputArea.classList.remove('hidden');
+                outputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            } catch (err) {
+                errorMessage.textContent = err.message || 'Unable to communicate with diagnostic backend.';
+                errorArea.classList.remove('hidden');
+            } finally {
+                rescueBtn.disabled = false;
+                btnText.textContent = 'Diagnose & Fix';
+                btnIcon.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+            }
+        }
+
+        rescueBtn.addEventListener('click', runRescue);
+
+        errorInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                runRescue();
+            }
+        });
+    </script>
+</body>
+</html>
