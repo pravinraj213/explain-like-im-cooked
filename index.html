@@ -268,7 +268,7 @@
                     <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
                     <h2 class="text-xs sm:text-sm font-bold text-amber-400 tracking-wider uppercase">What Actually Happened</h2>
                 </div>
-                <p id="postMortem" class="text-xs sm:text-sm text-slate-200 leading-relaxed pl-4 border-l-2 border-amber-500/40"></p>
+                <div id="postMortem" class="text-xs sm:text-sm text-slate-200 leading-relaxed pl-4 border-l-2 border-amber-500/40 space-y-2"></div>
             </div>
 
             <!-- Operational Context Card -->
@@ -277,7 +277,7 @@
                     <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
                     <h2 class="text-xs sm:text-sm font-bold text-indigo-400 tracking-wider uppercase">Operational Context</h2>
                 </div>
-                <p id="sanityCheck" class="text-xs sm:text-sm text-slate-300 leading-relaxed pl-4 border-l-2 border-indigo-500/40"></p>
+                <div id="sanityCheck" class="text-xs sm:text-sm text-slate-300 leading-relaxed pl-4 border-l-2 border-indigo-500/40 space-y-2"></div>
             </div>
         </section>
 
@@ -428,6 +428,45 @@
             return result;
         }
 
+        // Lightweight Markdown to HTML formatter
+        function renderMarkdown(text) {
+            if (!text) return '';
+            // Split run-on numbered items into clean lines
+            let normalized = text.replace(/(\s+)(\d+\.\s+)/g, '\n$2');
+
+            // Escape HTML
+            let escaped = normalized
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Code blocks
+            escaped = escaped.replace(/```([\s\S]*?)```/g, '<pre class="my-2 p-2.5 rounded bg-black/60 font-mono text-xs text-emerald-300 border border-white/10 overflow-x-auto">$1</pre>');
+
+            // Inline code `...`
+            escaped = escaped.replace(/`([^`]+)`/g, '<code class="font-mono text-xs px-1.5 py-0.5 rounded bg-black/60 text-indigo-300 border border-white/10">$1</code>');
+
+            // Bold **...**
+            escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong class="text-white font-semibold">$1</strong>');
+
+            // Format paragraphs and lists
+            const lines = escaped.split(/\n+/);
+            return lines.map(line => {
+                line = line.trim();
+                if (!line) return '';
+                if (/^\d+\.\s+/.test(line)) {
+                    const num = line.match(/^\d+\./)[0];
+                    const content = line.replace(/^\d+\.\s+/, '');
+                    return `<div class="flex items-start space-x-2 my-1.5"><span class="text-indigo-400 font-mono text-xs shrink-0 mt-0.5 font-bold">${num}</span><span class="text-slate-200">${content}</span></div>`;
+                }
+                if (/^[-*]\s+/.test(line)) {
+                    const content = line.replace(/^[-*]\s+/, '');
+                    return `<div class="flex items-start space-x-2 my-1.5"><span class="text-indigo-400 shrink-0 mt-1">•</span><span class="text-slate-200">${content}</span></div>`;
+                }
+                return `<p class="my-1.5 text-slate-200">${line}</p>`;
+            }).filter(Boolean).join('');
+        }
+
         // Trigger request
         async function runRescue() {
             const errorText = errorInput.value.trim();
@@ -470,8 +509,8 @@
 
                 const parsed = parseResponse(data.explanation || '');
                 tourniquetCode.textContent = parsed.tourniquet || data.explanation;
-                postMortem.textContent = parsed.postMortem || 'Analysis complete.';
-                sanityCheck.textContent = parsed.sanityCheck || 'Ready for re-execution.';
+                postMortem.innerHTML = renderMarkdown(parsed.postMortem || 'Analysis complete.');
+                sanityCheck.innerHTML = renderMarkdown(parsed.sanityCheck || 'Ready for re-execution.');
 
                 outputArea.classList.remove('hidden');
                 outputArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
