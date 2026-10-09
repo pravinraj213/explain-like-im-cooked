@@ -118,6 +118,9 @@ def lambda_handler(event, context):
                 })
             }
         
+        user_agent = event.get('headers', {}).get('user-agent', 'Unknown')
+        print(f"[VISIT] Path: {raw_path or '/'} | Agent: {user_agent[:50]}")
+
         # Serve the single-page web app
         try:
             with open(os.path.join(os.path.dirname(__file__), 'index.html'), 'r', encoding='utf-8') as f:
@@ -156,6 +159,9 @@ def lambda_handler(event, context):
         except (ValueError, TypeError):
             panic_level = 85
 
+        clean_snippet = error_text.replace('\n', ' ')[:75]
+        print(f"[DIAGNOSE_REQUEST] Urgency: {panic_level}% | Input: {clean_snippet}...")
+
         system_prompt = build_system_prompt(panic_level)
         user_message = f"Error log / stack trace:\n\n{error_text}\n\nUrgency level: {panic_level}/100"
 
@@ -178,6 +184,10 @@ def lambda_handler(event, context):
 
             output_message = response['output']['message']
             explanation = output_message['content'][0]['text']
+
+            bedrock_latency = response.get('metrics', {}).get('latencyMs', 0)
+            total_toks = response.get('usage', {}).get('totalTokens', 0)
+            print(f"[DIAGNOSE_SUCCESS] Latency: {bedrock_latency}ms | Tokens: {total_toks}")
 
             return {
                 'statusCode': 200,
